@@ -53,7 +53,7 @@ class PokerGameGUI:
         self.poker_table = tk.Label(self.game_display, image=self.table_display, width= 1080, height=720)
         self.poker_table.pack()
 
-        self.deal_player_card_button = tk.Button(self.game_display, width=50, height= 20, bg="black", command=self.update_player_cards)
+        self.deal_player_card_button = tk.Button(self.game_display, width=50, height= 20, bg="black", command=self.fold)
         self.deal_player_card_button.pack()
         self.game_display.pack()
 
@@ -62,7 +62,7 @@ class PokerGameGUI:
         # self.game_display.pack()
 
 
-        self.shuffle_button = tk.Button(self.game_display, width=50, height= 20, bg="green", command=self.shuffle)
+        self.shuffle_button = tk.Button(self.game_display, width=50, height= 20, bg="green", command=self.bet)
         self.shuffle_button.place(x=600, y=720)
 
         self.gamestart = tk.Button(self.game_display, width=50, height= 20, bg="red", command=self.gameloop)
@@ -77,23 +77,120 @@ class PokerGameGUI:
         self.community_card_labels = []
         self.player_card_labels = []
 
+    def bet(self):
+        bet = 20
+
+        if bet > self.game_state.player_stacks[self.game_state.betting_round % 6]:
+            print(self.game_state.player_names[self.game_state.betting_round], "bet too large")
+            return
+        elif self.game_state.betting_round == self.game_state.NUM_PLAYERS:
+            self.game_state.betting_round = 0
+            PokerGameGUI.deal_community_cards(self)
+            self.update_community_cards()
+            return
+        elif ((len(self.game_state.community_cards) == 5) and (self.game_state.betting_round + 1 == self.game_state.NUM_PLAYERS)):
+            PokerGameGUI.gameloop(self)
+            return
+        else:
+            self.game_state.pot_size += bet
+            self.game_state.player_stacks[self.game_state.betting_round % 6] = self.game_state.player_stacks[self.game_state.betting_round % 6] - bet
+            print(self.game_state.pot_size,  self.game_state.player_stacks[self.game_state.betting_round % 6], self.game_state.betting_round)
+            self.game_state.betting_round += 1
+            self.update_player_cards()
+            return
+
+    def check(self):
+        if self.game_state.betting_round == self.game_state.NUM_PLAYERS:
+            self.game_state.betting_round = 0
+            PokerGameGUI.deal_community_cards(self)
+            self.update_community_cards()
+        elif ((len(self.game_state.community_cards) == 5) and (self.game_state.betting_round + 1 == self.game_state.NUM_PLAYERS)):
+            PokerGameGUI.shuffle(self)
+            PokerGameGUI.gameloop(self)
+        else:
+            self.game_state.betting_round += 1
+
+    def fold(self):
+        ### Win conditional
+        print(self.game_state.player_names[self.game_state.betting_round % 6], "folded")
+        self.game_state.active_players[self.game_state.betting_round % 6] = False
+        self.game_state.betting_round += 1
+        self.game_state.num_folded += 1
+        for i in range(self.game_state.NUM_PLAYERS):
+            if ((self.game_state.num_folded == self.game_state.NUM_PLAYERS - 1) and (self.game_state.active_players[i] == True)):
+                print("Player", self.game_state.player_names[i], "Wins")
+                self.game_state.player_stacks[i] += self.game_state.pot_size
+                self.game_state.pot_size = 0
+                self.game_state.num_folded = 0
+                self.game_state.betting_round = 0
+                PokerGameGUI.gameloop(self)
+
+        
+
+        
+    def start_round(self):
+        self.game_state.player_hands = [[] for _ in range(self.game_state.NUM_PLAYERS)]
+        self.deck = self.game_state.deck
+        PokerGameGUI.deal_player_card(self)
+        for i in range(self.game_state.NUM_PLAYERS):
+            self.game_state.active_players[i] = True
+      
+    def player_turn(self):
+        #NOTE: Template for testing in the future the first person to act would shift through hands
+        #Sets name1 as the first person to act whenever the fucntion is called
+        self.game_state.player_turn[0] = True
+
+        #NOTE: This function call is good for one round of play
+        for i in range(self.game_state.NUM_PLAYERS):
+            if (self.game_state.player_turn[i] == True):
+                #NOTE: Player activity happens here.
+                choice = random.randint(1, 3)
+                if choice == 1:
+                    PokerGameGUI.fold(self)
+                if choice == 2:
+                    PokerGameGUI.check(self)
+                if choice == 3:
+                    PokerGameGUI.bet(self)
+
+            self.game_state.player_turn[i % 6] == False
+            self.game_state.player_turn[(i+1) % 6] == True
+
+            if self.game_state.betting_round == self.game_state.NUM_PLAYERS:
+                time.sleep(1)
+                self.root.update()
+                PokerGameGUI.update_community_cards(self)
+
+            if ((len(self.game_state.community_cards) == 5) and (self.game_state.betting_round + 1 == self.game_state.NUM_PLAYERS)):
+                PokerGameGUI.gameloop(self)
+
+            PokerGameGUI.player_turn(self)
+
+
     def gameloop(self):
-        while(1):
-            time.sleep(1)
-            self.deal_player_card_button.invoke()
+        # while(1):
+            self.shuffle()
+            self.start_round()
+            self.update_player_cards()
             self.root.update()
-            time.sleep(1)
-            self.deal_community_card.invoke()
-            self.root.update()
-            time.sleep(1)
-            self.deal_community_card.invoke()
-            self.root.update()
-            time.sleep(1)
-            self.deal_community_card.invoke()
-            self.root.update()
-            time.sleep(1)
-            self.shuffle_button.invoke()
-            self.root.update()
+            time.sleep(.25)
+            self.player_turn()
+
+
+            #NOTE: Function for tracking player turn too keep the action inside of gameloop
+
+
+            # time.sleep(1)
+            # self.deal_community_card.invoke()
+            # self.root.update()
+            # time.sleep(1)
+            # self.deal_community_card.invoke()
+            # self.root.update()
+            # time.sleep(1)
+            # self.deal_community_card.invoke()
+            # self.root.update()
+            # time.sleep(1)
+            # self.shuffle_button.invoke()
+            # self.root.update()
 
 
 
@@ -101,9 +198,6 @@ class PokerGameGUI:
         #   Assigns user bal card and name for game creation
         ###
     def update_player_cards(self):
-        self.game_state.player_hands = [[] for _ in range(self.game_state.NUM_PLAYERS)]
-        self.deck = self.game_state.deck
-        PokerGameGUI.deal_player_card(self)
 
         for i in range(self.game_state.NUM_PLAYERS):
             x = 130
@@ -148,9 +242,8 @@ class PokerGameGUI:
         #   Deals and displays community cards to the screen.
         ###
     def update_community_cards(self):
-        PokerGameGUI.deal_community_cards(self)
 
- 
+        print(self.game_state.community_cards)
         for i in range(len(self.game_state.community_cards)):
                 self.card = self.game_state.community_cards[i]
                 self.cCard = Image.open(f"resources/cards/{self.card}.jpg")
@@ -204,14 +297,15 @@ class PokerGameGUI:
             self.player_hands_labels[i].config(text=f"bal: {balance[i]} Player {i+1} Hand: {hand[0]}, {hand[1]}")
 
     def deal_community_cards(self):
-        if len(self.game_state.community_cards) >= 5:
+
+        if len(self.game_state.community_cards) == 0:
+            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
+            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
+            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
             return
-        if len(self.game_state.community_cards) < 3:
+        if len(self.game_state.community_cards) >= 3:
             self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
-            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
-            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
-        else:
-            self.game_state.deal_community_cards([PokerGameGUI.generate_random_card(self)])
+
 
         
     def deal_player_card(self):

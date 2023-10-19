@@ -21,6 +21,7 @@ class GameState:
         self.betting_round_history = []
         self.player_names = ['name1', 'name2', 'name3', 'name4', 'name5', 'name6']
         self.dealt_cards = []
+        self.num_folded = 0
         self.player_turn = [False] * self.NUM_PLAYERS
         self.deck = [
                 '2H', '3H', '4H', '5H', '6H', '7H', '8H', '9H', '10H', 'JH', 'QH', 'KH', 'AH',
